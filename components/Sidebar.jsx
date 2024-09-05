@@ -1,12 +1,62 @@
+/* eslint-disable react-hooks/exhaustive-deps */
+"use client";
+import {
+  getDocumentsByAuthor,
+  getDocumentsByTag,
+  getDocumentsCategory,
+} from "@/utils/doc_util";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
 
 const Sidebar = ({ docs }) => {
-  const roots = docs.filter((doc) => !doc.parent);
+  const pathName = usePathname();
+  const [rootNods, setRootNods] = useState([]);
+  const [nonRootNodes, setNonRootNodes] = useState({});
 
-  const nonRoots = Object.groupBy(
-    docs.filter((doc) => doc.parent),
-    ({ parent }) => parent
-  );
+  useEffect(() => {
+    let matchedDocs = docs;
+
+    if (pathName.includes("/tags")) {
+      const tag = pathName.split("/")[2];
+      matchedDocs = getDocumentsByTag(docs, tag);
+    } else if (pathName.includes("/authors")) {
+      const author = pathName.split("/")[2];
+      matchedDocs = getDocumentsByAuthor(docs, author);
+    } else if (pathName.includes("/categories")) {
+      const category = pathName.split("/")[2];
+      matchedDocs = getDocumentsCategory(docs, category);
+    }
+
+    const roots = matchedDocs.filter((doc) => !doc.parent);
+
+    const nonRoots = Object.groupBy(
+      matchedDocs.filter((doc) => doc.parent),
+      ({ parent }) => parent
+    );
+
+    const nonRootsKey = Reflect.ownKeys(nonRoots);
+    nonRootsKey.forEach((key) => {
+      const foundInRoots = roots.find((root) => root.id === key);
+      if (!foundInRoots) {
+        const foundInDocs = docs.find((doc) => doc.id === key);
+        roots.push(foundInDocs);
+      }
+    });
+
+    roots.sort((a, b) => {
+      if (a.order < b.order) {
+        return -1;
+      }
+      if (a.order > b.order) {
+        return 1;
+      }
+      return 0;
+    });
+
+    setRootNods(roots);
+    setNonRootNodes(nonRoots);
+  }, [pathName]);
 
   return (
     <nav className="lg:block my-10">
@@ -16,7 +66,7 @@ const Sidebar = ({ docs }) => {
           <div className="absolute inset-y-0 left-2 w-px bg-zinc-900/10 dark:bg-white/5"></div>
           <div className="absolute left-2 h-6 w-px bg-emerald-500"></div>
           <ul role="list" className="border-l border-transparent">
-            {roots.map((rootNode) => (
+            {rootNods.map((rootNode) => (
               <li key={rootNode.id} className="relative">
                 <Link
                   aria-current="page"
@@ -25,9 +75,9 @@ const Sidebar = ({ docs }) => {
                 >
                   <span className="truncate">{rootNode.title}</span>
                 </Link>
-                {nonRoots[rootNode.id] && (
+                {nonRootNodes[rootNode.id] && (
                   <ul role="list" className="border-l border-transparent">
-                    {nonRoots[rootNode.id].map((subRoot) => (
+                    {nonRootNodes[rootNode.id].map((subRoot) => (
                       <li key={subRoot.id}>
                         <Link
                           aria-current="page"
